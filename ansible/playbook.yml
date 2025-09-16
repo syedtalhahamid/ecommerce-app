@@ -1,0 +1,107 @@
+- hosts: all
+  become: yes
+  tasks:
+    # ---------------- System Preparation ----------------
+    - name: Install required packages
+      apt:
+        name: ["apt-transport-https", "ca-certificates", "curl", "software-properties-common", "gnupg"]
+        state: present
+        update_cache: yes
+
+    # ---------------- Docker ----------------
+    - name: Install Docker
+      apt:
+        name: docker.io
+        state: present
+
+    - name: Enable & start Docker
+      systemd:
+        name: docker
+        state: started
+        enabled: yes
+
+    - name: Install Docker Compose
+      apt:
+        name: docker-compose
+        state: present
+
+    # ---------------- Java ----------------
+    - name: Install Java 17
+      apt:
+        name: openjdk-17-jdk
+        state: present
+        update_cache: yes
+
+    - name: Verify Java version
+      command: java -version
+      register: java_version
+      ignore_errors: yes
+
+    - debug:
+        msg: "Java version output: {{ java_version.stderr }}"
+
+    # ---------------- Jenkins ----------------
+    - name: Add Jenkins repo key
+      shell: |
+        curl -fsSL https://pkg.jenkins.io/debian-stable/jenkins.io-2023.key | sudo tee \
+        /usr/share/keyrings/jenkins-keyring.asc > /dev/null
+
+    - name: Add Jenkins apt repository
+      apt_repository:
+        repo: "deb [signed-by=/usr/share/keyrings/jenkins-keyring.asc] https://pkg.jenkins.io/debian-stable binary/"
+        state: present
+
+    - name: Update apt cache
+      apt:
+        update_cache: yes
+
+    - name: Install Jenkins
+      apt:
+        name: jenkins
+        state: present
+
+    - name: Ensure Jenkins runs with Java 17
+      lineinfile:
+        path: /etc/default/jenkins
+        regexp: '^JAVA_HOME='
+        line: 'JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64'
+        state: present
+      notify: Restart Jenkins
+
+    - name: Enable & start Jenkins
+      systemd:
+        name: jenkins
+        state: started
+        enabled: yes
+
+    # ---------------- Firewall ----------------
+    - name: Allow Jenkins port 8080
+      ansible.builtin.ufw:
+        rule: allow
+        port: "8080"
+        proto: tcp
+
+    # ---------------- App Deployment ----------------
+    - name: Create app directory
+      file:
+        path: /opt/ecommerce
+        state: directory
+
+    - name: Copy project files
+      copy:
+        src: ../
+        dest: /opt/ecommerce
+        owner: ubuntu
+        group: ubuntu
+        mode: 0755
+
+    - name: Run docker-compose
+      shell: docker-compose -f /opt/ecommerce/docker-compose.yml up -d
+      args:
+        chdir: /opt/ecommerce
+
+  handlers:
+    - name: Restart Jenkins
+      systemd:
+        name: jenkins
+        state: restarted

@@ -1,0 +1,14 @@
+replicaCount: 1
+
+image:
+  repository: myshop
+  tag: v1
+  pullPolicy: IfNotPresent
+
+service:
+  type: NodePort
+  port: 5000
+  targetPort: 5000
+  nodePort: 30007   # NodePort for external access
+
+resources: {}
