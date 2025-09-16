@@ -2,8 +2,7 @@ pipeline {
   agent any
   stages {
     stage('Checkout') {
-      steps { git 'https://github.com/syedtalhahamid/ecomm-devops.git
-      // ' }
+      steps { git 'https://github.com/syedtalhahamid/ecomm-devops.git' }
     }
     stage('Build Docker') {
       steps { sh 'docker build -t myshop:v1 .' }
